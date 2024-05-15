@@ -1,0 +1,9 @@
+{
+  "rewrites": [
+    { "source": "/:path((?!api).*)", "destination": "/" },
+    {
+      "source": "/api/:path*",
+      "destination": "http://172.234.95.57:1324/auction-master/backend/:path*"
+    }
+  ]
+}
