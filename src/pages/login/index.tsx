@@ -6,7 +6,6 @@ import { Controller, useFormContext } from "react-hook-form";
 
 export default function Login() {
   const { remember } = useApiStore();
-  console.log({ remember })
   return (
     <AuthPage
       type="login"

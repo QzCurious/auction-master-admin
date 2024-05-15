@@ -1,5 +1,4 @@
 import { apiClient } from "@api/client";
-import { jwtDecode } from "jwt-decode";
 import { z } from "zod";
 import { useApiStore } from "./apiStore";
 

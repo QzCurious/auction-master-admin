@@ -1,3 +1,7 @@
+import { HttpError } from "@refinedev/core";
+import { useApiStore } from "./apiStore";
+import { sessionRefresh } from "./session-refresh";
+
 export async function apiClient<Data, ErrorCode extends string | null = null>(
   input: string,
   init?: RequestInit | undefined
@@ -15,11 +19,14 @@ export async function apiClient<Data, ErrorCode extends string | null = null>(
         }
       : never)
 > {
+  renewTokenIfExpired();
+  const token = useApiStore.getState().token;
   const url = import.meta.env.VITE_API_BASE_URL + input;
   const res = await fetch(url, {
     ...init,
     headers: {
       ...init?.headers,
+      Authorization: token ? `Bearer ${token}` : "",
     },
   });
 
@@ -28,7 +35,6 @@ export async function apiClient<Data, ErrorCode extends string | null = null>(
 
     if (import.meta.env.DEV) {
       console.log(`apiClient:`, `[${init?.method ?? "GET"} ${url}]:`);
-
       console.log(
         `payload:`,
         init?.body instanceof FormData
@@ -36,6 +42,16 @@ export async function apiClient<Data, ErrorCode extends string | null = null>(
           : init?.body
       );
       console.log(`response:`, j);
+    }
+
+    // admin token error
+    if (j.status.code === "1003") {
+      renewTokenIfExpired();
+      if (!useApiStore.getState().jwt) {
+        throw { statusCode: 401 } as HttpError;
+      } else {
+        return apiClient(input, init);
+      }
     }
 
     if (j.status.code !== "0") {
@@ -65,3 +81,16 @@ export type ApiResponse<Data, ErrorCode extends string | null> = {
   data: Data | null;
   status: ApiStatus<ErrorCode>;
 };
+
+let isRenewing = false;
+export async function renewTokenIfExpired() {
+  if (isRenewing) return;
+  const jwt = useApiStore.getState().jwt;
+  if (!jwt) return;
+  const refreshToken = useApiStore.getState().refreshToken;
+  if (jwt.exp * 1000 < Date.now() && refreshToken) {
+    const formData = new FormData();
+    formData.append("refreshToken", refreshToken);
+    await sessionRefresh(formData);
+  }
+}

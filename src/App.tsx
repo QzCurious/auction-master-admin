@@ -1,11 +1,17 @@
 import { useApiStore } from "@api/apiStore";
+import { renewTokenIfExpired } from "@api/client";
 import { session } from "@api/session";
 import GitHubIcon from "@mui/icons-material/GitHub";
 import GoogleIcon from "@mui/icons-material/Google";
 import CssBaseline from "@mui/material/CssBaseline";
 import GlobalStyles from "@mui/material/GlobalStyles";
 import { ThemeProvider } from "@mui/material/styles";
-import { AuthProvider, Authenticated, Refine } from "@refinedev/core";
+import {
+  AuthProvider,
+  Authenticated,
+  HttpError,
+  Refine,
+} from "@refinedev/core";
 import {
   AuthPage,
   ErrorComponent,
@@ -20,11 +26,10 @@ import routerProvider, {
   NavigateToResource,
   UnsavedChangesNotifier,
 } from "@refinedev/react-router-v6";
-import dataProvider from "@refinedev/simple-rest";
 import { BrowserRouter, Outlet, Route, Routes } from "react-router-dom";
-import { PostCreate, PostEdit, PostList } from "../src/pages/posts";
 import Login from "./pages/login";
-import { sessionRefresh } from "@api/session-refresh";
+import { RoleCreate, RoleEdit, RoleList } from "./pages/roles";
+import { dataProvider } from "./providers/data-provider";
 
 /**
  *  mock auth credentials to simulate authentication
@@ -34,105 +39,107 @@ const authCredentials = {
   password: "1234",
 };
 
-const App: React.FC = () => {
-  const authProvider: AuthProvider = {
-    login: async ({ email, password, rememberMe }) => {
-      const formData = new FormData();
-      formData.append("account", email);
-      formData.append("password", password);
-      const res = await session(formData);
+const authProvider: AuthProvider = {
+  login: async ({ email, password, rememberMe }) => {
+    const formData = new FormData();
+    formData.append("account", email);
+    formData.append("password", password);
+    const res = await session(formData);
 
-      if (res.parseError) {
-        return {
-          success: false,
-          error: {
-            message: "Validation error",
-            name: "Validation error",
-          },
-        };
-      }
+    if (res.parseError) {
+      return {
+        success: false,
+        error: {
+          message: "Validation error",
+          name: "Validation error",
+        },
+      };
+    }
 
-      if (res.error) {
-        return {
-          success: false,
-          error: {
-            message: "Login failed",
-            name: "Invalid email or password",
-          },
-        };
-      }
+    if (res.error) {
+      return {
+        success: false,
+        error: {
+          message: "Login failed",
+          name: "Invalid email or password",
+        },
+      };
+    }
 
-      useApiStore.getState().setRemember(rememberMe ? email : null);
+    useApiStore.getState().setRemember(rememberMe ? email : null);
 
+    return {
+      success: true,
+      redirectTo: "/",
+    };
+  },
+  register: async (params) => {
+    if (params.email === authCredentials.email && params.password) {
+      localStorage.setItem("email", params.email);
       return {
         success: true,
         redirectTo: "/",
       };
-    },
-    register: async (params) => {
-      if (params.email === authCredentials.email && params.password) {
-        localStorage.setItem("email", params.email);
-        return {
-          success: true,
-          redirectTo: "/",
-        };
-      }
-      return {
-        success: false,
-        error: {
-          message: "Register failed",
-          name: "Invalid email or password",
-        },
-      };
-    },
-    updatePassword: async (params) => {
-      if (params.password === authCredentials.password) {
-        //we can update password here
-        return {
-          success: true,
-        };
-      }
-      return {
-        success: false,
-        error: {
-          message: "Update password failed",
-          name: "Invalid password",
-        },
-      };
-    },
-    forgotPassword: async (params) => {
-      if (params.email === authCredentials.email) {
-        //we can send email with reset password link here
-        return {
-          success: true,
-        };
-      }
-      return {
-        success: false,
-        error: {
-          message: "Forgot password failed",
-          name: "Invalid email",
-        },
-      };
-    },
-    logout: async () => {
-      useApiStore.getState().clearLogin();
+    }
+    return {
+      success: false,
+      error: {
+        message: "Register failed",
+        name: "Invalid email or password",
+      },
+    };
+  },
+  updatePassword: async (params) => {
+    if (params.password === authCredentials.password) {
+      //we can update password here
       return {
         success: true,
-        redirectTo: "/login",
       };
-    },
-    onError: async (error) => {
-      if (error.response?.status === 401) {
-        return {
-          logout: true,
-        };
-      }
+    }
+    return {
+      success: false,
+      error: {
+        message: "Update password failed",
+        name: "Invalid password",
+      },
+    };
+  },
+  forgotPassword: async (params) => {
+    if (params.email === authCredentials.email) {
+      //we can send email with reset password link here
+      return {
+        success: true,
+      };
+    }
+    return {
+      success: false,
+      error: {
+        message: "Forgot password failed",
+        name: "Invalid email",
+      },
+    };
+  },
+  logout: async () => {
+    useApiStore.getState().clearLogin();
+    return {
+      success: true,
+      redirectTo: "/login",
+    };
+  },
+  onError: async (error: HttpError) => {
+    if (error.statusCode === 401) {
+      return {
+        logout: true,
+      };
+    }
 
-      return { error };
-    },
-    check: async () => {
-      const failed = {
+    return { error };
+  },
+  check: async () => {
+    renewTokenIfExpired();
+    const jwt = useApiStore.getState().jwt;
+    if (!jwt) {
+      return {
         authenticated: false,
         error: {
           message: "Check failed",
@@ -141,37 +148,21 @@ const App: React.FC = () => {
         logout: true,
         redirectTo: "/login",
       };
-      const jwt = useApiStore.getState().jwt;
-      if (!jwt) {
-        return failed;
-      }
+    }
 
-      const refreshToken = useApiStore.getState().refreshToken;
-      if (jwt.exp * 1000 < Date.now() && refreshToken) {
-        const formData = new FormData();
-        formData.append("refreshToken", refreshToken);
-        const res = await sessionRefresh(formData);
-        if (res.parseError) {
-          throw Error("auth check parse error");
-        }
-        if (res.error) {
-          return failed;
-        }
-      }
+    return {
+      authenticated: true,
+    };
+  },
+  getPermissions: async () => ["admin"],
+  getIdentity: async () => ({
+    id: 1,
+    name: "Jane Doe",
+    avatar: "https://unsplash.com/photos/IWLOvomUmWU/download?force=true&w=640",
+  }),
+};
 
-      return {
-        authenticated: true,
-      };
-    },
-    getPermissions: async () => ["admin"],
-    getIdentity: async () => ({
-      id: 1,
-      name: "Jane Doe",
-      avatar:
-        "https://unsplash.com/photos/IWLOvomUmWU/download?force=true&w=640",
-    }),
-  };
-
+const App: React.FC = () => {
   return (
     <BrowserRouter>
       <ThemeProvider theme={RefineThemes.Blue}>
@@ -180,15 +171,15 @@ const App: React.FC = () => {
         <RefineSnackbarProvider>
           <Refine
             authProvider={authProvider}
-            dataProvider={dataProvider("https://api.fake-rest.refine.dev")}
+            dataProvider={dataProvider}
             routerProvider={routerProvider}
             notificationProvider={useNotificationProvider}
             resources={[
               {
-                name: "posts",
-                list: "/posts",
-                edit: "/posts/edit/:id",
-                create: "/posts/create",
+                name: "roles",
+                list: "/roles",
+                edit: "/roles/edit/:id",
+                create: "/roles/create",
               },
             ]}
             options={{
@@ -203,7 +194,11 @@ const App: React.FC = () => {
                     key="authenticated-routes"
                     fallback={<CatchAllNavigate to="/login" />}
                   >
-                    <ThemedLayoutV2>
+                    <ThemedLayoutV2
+                      Title={({ collapsed }) =>
+                        collapsed ? "" : <>Auction Master Admin</>
+                      }
+                    >
                       <Outlet />
                     </ThemedLayoutV2>
                   </Authenticated>
@@ -211,13 +206,13 @@ const App: React.FC = () => {
               >
                 <Route
                   index
-                  element={<NavigateToResource resource="posts" />}
+                  element={<NavigateToResource resource="roles" />}
                 />
 
-                <Route path="/posts">
-                  <Route index element={<PostList />} />
-                  <Route path="create" element={<PostCreate />} />
-                  <Route path="edit/:id" element={<PostEdit />} />
+                <Route path="/roles">
+                  <Route index element={<RoleList />} />
+                  <Route path="create" element={<RoleCreate />} />
+                  <Route path="edit/:id" element={<RoleEdit />} />
                 </Route>
               </Route>
 
