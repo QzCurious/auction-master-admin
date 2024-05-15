@@ -3,7 +3,7 @@ import { DataGrid, GridColDef } from "@mui/x-data-grid";
 import { DeleteButton, EditButton, List, useDataGrid } from "@refinedev/mui";
 import React from "react";
 
-export const RoleList: React.FC = () => {
+export const RoleList = () => {
   const { dataGridProps } = useDataGrid<Role>({ sorters: { mode: "off" } });
 
   const columns = React.useMemo<GridColDef<Role>[]>(
@@ -27,6 +27,7 @@ export const RoleList: React.FC = () => {
         renderCell: function render({ row }) {
           return (
             <>
+              <EditButton hideText recordItemId={row.role} />
               <DeleteButton hideText recordItemId={row.role} />
             </>
           );

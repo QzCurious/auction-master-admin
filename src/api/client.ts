@@ -33,7 +33,7 @@ export async function apiClient<Data, ErrorCode extends string | null = null>(
   try {
     const j: ApiResponse<Data, ErrorCode> = await res.json();
 
-    if (import.meta.env.DEV) {
+    if (import.meta.env.VITE_API_LOG) {
       console.log(`apiClient:`, `[${init?.method ?? "GET"} ${url}]:`);
       console.log(
         `payload:`,
@@ -89,8 +89,10 @@ export async function renewTokenIfExpired() {
   if (!jwt) return;
   const refreshToken = useApiStore.getState().refreshToken;
   if (jwt.exp * 1000 < Date.now() && refreshToken) {
+    isRenewing = true;
     const formData = new FormData();
     formData.append("refreshToken", refreshToken);
     await sessionRefresh(formData);
+    isRenewing = false;
   }
 }

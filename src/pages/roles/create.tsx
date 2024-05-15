@@ -6,7 +6,7 @@ import { Create } from "@refinedev/mui";
 import { useForm } from "@refinedev/react-hook-form";
 import { Nullable } from "../../interfaces";
 
-export const RoleCreate: React.FC = () => {
+export const RoleCreate = () => {
   const {
     saveButtonProps,
     register,

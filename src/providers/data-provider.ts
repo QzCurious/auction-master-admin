@@ -1,9 +1,11 @@
+import { addPermissionToRole } from "@api/backend/rbac/addPermissionToRole";
 import { createRole } from "@api/backend/rbac/createRole";
 import { deleteRole } from "@api/backend/rbac/deleteRole";
-import { permissions } from "@api/backend/rbac/permissions";
+import { Permission, permissions } from "@api/backend/rbac/permissions";
+import { removePermissionToRole } from "@api/backend/rbac/removePermissionToRole";
 import { roles } from "@api/backend/rbac/roles";
+import { rolesPermissions } from "@api/backend/rbac/rolesPermissions";
 import type {
-  BaseRecord,
   CreateParams,
   CreateResponse,
   DataProvider,
@@ -49,10 +51,21 @@ export const dataProvider: DataProvider = {
         throw new Error("Resource not found");
     }
   },
-  getOne: function <TData extends BaseRecord = BaseRecord>(
-    params: GetOneParams
-  ): Promise<GetOneResponse<TData>> {
-    throw new Error("Function not implemented.");
+  getOne: async function ({
+    resource,
+    id,
+  }: GetOneParams): Promise<GetOneResponse<any>> {
+    switch (resource) {
+      case "roles":
+        const res = await rolesPermissions();
+        const one = res.data.find((d) => d.role === id.toString());
+        if (!one) {
+          throw { statusCode: 404 } as HttpError;
+        }
+        return { data: one };
+      default:
+        throw new Error("Resource not found");
+    }
   },
   create: async function ({
     resource,
@@ -75,10 +88,35 @@ export const dataProvider: DataProvider = {
         throw new Error("Resource not found");
     }
   },
-  update: function <TData extends BaseRecord = BaseRecord, TVariables = {}>(
-    params: UpdateParams<TVariables>
-  ): Promise<UpdateResponse<TData>> {
-    throw new Error("Function not implemented.");
+  update: async function ({
+    resource,
+    variables,
+  }: UpdateParams<any>): Promise<UpdateResponse<any>> {
+    switch (resource) {
+      case "roles": {
+        const addPermissions = variables.addPermissions as Permission[];
+        const removePermissions = variables.removePermissions as Permission[];
+        await Promise.all([
+          ...addPermissions.map((p) => {
+            const formData = new FormData();
+            formData.append("role", variables.role);
+            formData.append("method", p.method);
+            formData.append("url", p.url);
+            return addPermissionToRole(formData);
+          }),
+          ...removePermissions.map((p) => {
+            const formData = new FormData();
+            formData.append("role", variables.role);
+            formData.append("method", p.method);
+            formData.append("url", p.url);
+            return removePermissionToRole(formData);
+          }),
+        ]);
+        return { data: null };
+      }
+      default:
+        throw new Error("Resource not found");
+    }
   },
   deleteOne: async function ({
     resource,

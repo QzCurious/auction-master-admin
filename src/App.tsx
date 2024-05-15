@@ -163,7 +163,7 @@ const authProvider: AuthProvider = {
   }),
 };
 
-const App: React.FC = () => {
+const App = () => {
   return (
     <BrowserRouter>
       <ThemeProvider theme={RefineThemes.Blue}>

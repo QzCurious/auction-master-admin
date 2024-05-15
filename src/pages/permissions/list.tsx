@@ -5,7 +5,7 @@ import { DataGrid, GridColDef } from "@mui/x-data-grid";
 
 import { Permission } from "@api/backend/rbac/permissions";
 
-export const PermissionList: React.FC = () => {
+export const PermissionList = () => {
   const { dataGridProps } = useDataGrid<Permission>();
 
   const columns = React.useMemo<GridColDef<Permission>[]>(
