@@ -1,75 +1,72 @@
-import {
-  GitHubBanner,
-  Refine,
-  AuthProvider,
-  Authenticated,
-} from "@refinedev/core";
-import {
-  ThemedLayoutV2,
-  ErrorComponent,
-  RefineThemes,
-  useNotificationProvider,
-  RefineSnackbarProvider,
-  AuthPage,
-} from "@refinedev/mui";
-import CssBaseline from "@mui/material/CssBaseline";
-import GlobalStyles from "@mui/material/GlobalStyles";
-import FormControlLabel from "@mui/material/FormControlLabel";
-import Checkbox from "@mui/material/Checkbox";
-import { ThemeProvider } from "@mui/material/styles";
-import dataProvider from "@refinedev/simple-rest";
-import routerProvider, {
-  NavigateToResource,
-  CatchAllNavigate,
-  UnsavedChangesNotifier,
-  DocumentTitleHandler,
-} from "@refinedev/react-router-v6";
-import { BrowserRouter, Routes, Route, Outlet } from "react-router-dom";
-import { useFormContext } from "react-hook-form";
+import { useApiStore } from "@api/apiStore";
+import { session } from "@api/session";
 import GitHubIcon from "@mui/icons-material/GitHub";
 import GoogleIcon from "@mui/icons-material/Google";
-
-import { PostList, PostCreate, PostEdit } from "../src/pages/posts";
+import CssBaseline from "@mui/material/CssBaseline";
+import GlobalStyles from "@mui/material/GlobalStyles";
+import { ThemeProvider } from "@mui/material/styles";
+import { AuthProvider, Authenticated, Refine } from "@refinedev/core";
+import {
+  AuthPage,
+  ErrorComponent,
+  RefineSnackbarProvider,
+  RefineThemes,
+  ThemedLayoutV2,
+  useNotificationProvider,
+} from "@refinedev/mui";
+import routerProvider, {
+  CatchAllNavigate,
+  DocumentTitleHandler,
+  NavigateToResource,
+  UnsavedChangesNotifier,
+} from "@refinedev/react-router-v6";
+import dataProvider from "@refinedev/simple-rest";
+import { BrowserRouter, Outlet, Route, Routes } from "react-router-dom";
+import { PostCreate, PostEdit, PostList } from "../src/pages/posts";
+import Login from "./pages/login";
+import { sessionRefresh } from "@api/session-refresh";
 
 /**
  *  mock auth credentials to simulate authentication
  */
 const authCredentials = {
-  email: "demo@refine.dev",
-  password: "demodemo",
+  email: "qzcurious@gmail.com",
+  password: "1234",
 };
 
 const App: React.FC = () => {
   const authProvider: AuthProvider = {
-    login: async ({ providerName, email }) => {
-      if (providerName === "google") {
-        window.location.href = "https://accounts.google.com/o/oauth2/v2/auth";
+    login: async ({ email, password, rememberMe }) => {
+      const formData = new FormData();
+      formData.append("account", email);
+      formData.append("password", password);
+      const res = await session(formData);
+
+      if (res.parseError) {
         return {
-          success: true,
+          success: false,
+          error: {
+            message: "Validation error",
+            name: "Validation error",
+          },
         };
       }
 
-      if (providerName === "github") {
-        window.location.href = "https://github.com/login/oauth/authorize";
+      if (res.error) {
         return {
-          success: true,
+          success: false,
+          error: {
+            message: "Login failed",
+            name: "Invalid email or password",
+          },
         };
       }
 
-      if (email === authCredentials.email) {
-        localStorage.setItem("email", email);
-        return {
-          success: true,
-          redirectTo: "/",
-        };
-      }
+      useApiStore.getState().setRemember(rememberMe ? email : null);
 
       return {
-        success: false,
-        error: {
-          message: "Login failed",
-          name: "Invalid email or password",
-        },
+        success: true,
+        redirectTo: "/",
       };
     },
     register: async (params) => {
@@ -119,7 +116,7 @@ const App: React.FC = () => {
       };
     },
     logout: async () => {
-      localStorage.removeItem("email");
+      useApiStore.getState().clearLogin();
       return {
         success: true,
         redirectTo: "/login",
@@ -134,20 +131,38 @@ const App: React.FC = () => {
 
       return { error };
     },
-    check: async () =>
-      localStorage.getItem("email")
-        ? {
-            authenticated: true,
-          }
-        : {
-            authenticated: false,
-            error: {
-              message: "Check failed",
-              name: "Not authenticated",
-            },
-            logout: true,
-            redirectTo: "/login",
-          },
+    check: async () => {
+      const failed = {
+        authenticated: false,
+        error: {
+          message: "Check failed",
+          name: "Not authenticated",
+        },
+        logout: true,
+        redirectTo: "/login",
+      };
+      const jwt = useApiStore.getState().jwt;
+      if (!jwt) {
+        return failed;
+      }
+
+      const refreshToken = useApiStore.getState().refreshToken;
+      if (jwt.exp * 1000 < Date.now() && refreshToken) {
+        const formData = new FormData();
+        formData.append("refreshToken", refreshToken);
+        const res = await sessionRefresh(formData);
+        if (res.parseError) {
+          throw Error("auth check parse error");
+        }
+        if (res.error) {
+          return failed;
+        }
+      }
+
+      return {
+        authenticated: true,
+      };
+    },
     getPermissions: async () => ["admin"],
     getIdentity: async () => ({
       id: 1,
@@ -157,29 +172,8 @@ const App: React.FC = () => {
     }),
   };
 
-  const RememeberMe = () => {
-    const { register } = useFormContext();
-
-    return (
-      <FormControlLabel
-        sx={{
-          span: {
-            fontSize: "12px",
-            color: "text.secondary",
-          },
-        }}
-        color="secondary"
-        control={
-          <Checkbox size="small" id="rememberMe" {...register("rememberMe")} />
-        }
-        label="Remember me"
-      />
-    );
-  };
-
   return (
     <BrowserRouter>
-      <GitHubBanner />
       <ThemeProvider theme={RefineThemes.Blue}>
         <CssBaseline />
         <GlobalStyles styles={{ html: { WebkitFontSmoothing: "auto" } }} />
@@ -234,44 +228,7 @@ const App: React.FC = () => {
                   </Authenticated>
                 }
               >
-                <Route
-                  path="/login"
-                  element={
-                    <AuthPage
-                      type="login"
-                      rememberMe={<RememeberMe />}
-                      formProps={{
-                        defaultValues: {
-                          ...authCredentials,
-                        },
-                      }}
-                      providers={[
-                        {
-                          name: "google",
-                          label: "Sign in with Google",
-                          icon: (
-                            <GoogleIcon
-                              style={{
-                                fontSize: 24,
-                              }}
-                            />
-                          ),
-                        },
-                        {
-                          name: "github",
-                          label: "Sign in with GitHub",
-                          icon: (
-                            <GitHubIcon
-                              style={{
-                                fontSize: 24,
-                              }}
-                            />
-                          ),
-                        },
-                      ]}
-                    />
-                  }
-                />
+                <Route path="/login" element={<Login />} />
                 <Route
                   path="/register"
                   element={
