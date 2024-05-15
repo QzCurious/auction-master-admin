@@ -28,6 +28,7 @@ import routerProvider, {
 } from "@refinedev/react-router-v6";
 import { BrowserRouter, Outlet, Route, Routes } from "react-router-dom";
 import Login from "./pages/login";
+import { PermissionList } from "./pages/permissions";
 import { RoleCreate, RoleEdit, RoleList } from "./pages/roles";
 import { dataProvider } from "./providers/data-provider";
 
@@ -181,6 +182,10 @@ const App: React.FC = () => {
                 edit: "/roles/edit/:id",
                 create: "/roles/create",
               },
+              {
+                name: "permissions",
+                list: "/permissions",
+              },
             ]}
             options={{
               syncWithLocation: true,
@@ -213,6 +218,10 @@ const App: React.FC = () => {
                   <Route index element={<RoleList />} />
                   <Route path="create" element={<RoleCreate />} />
                   <Route path="edit/:id" element={<RoleEdit />} />
+                </Route>
+
+                <Route path="/permissions">
+                  <Route index element={<PermissionList />} />
                 </Route>
               </Route>
 

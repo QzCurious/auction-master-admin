@@ -1,5 +1,6 @@
 import { createRole } from "@api/backend/rbac/createRole";
 import { deleteRole } from "@api/backend/rbac/deleteRole";
+import { permissions } from "@api/backend/rbac/permissions";
 import { roles } from "@api/backend/rbac/roles";
 import type {
   BaseRecord,
@@ -27,12 +28,23 @@ export const dataProvider: DataProvider = {
     sorters,
   }: GetListParams): Promise<GetListResponse<any>> {
     switch (resource) {
-      case "roles":
+      case "roles": {
         const res = await roles();
         return {
           data: res.data.map((role) => ({ id: role.role, ...role })),
           total: res.data.length,
         };
+      }
+      case "permissions": {
+        const res = await permissions();
+        return {
+          data: res.data.map((permission) => ({
+            id: permission.method + permission.url,
+            ...permission,
+          })),
+          total: res.data.length,
+        };
+      }
       default:
         throw new Error("Resource not found");
     }
