@@ -1,20 +1,15 @@
-import { apiClient } from "@api/client";
-import { z } from "zod";
+import { apiClient, withAuth } from "@api/apiClient";
 
 export type Role = { role: string; description: string };
 
-type ApiData = "Success";
+type Data = "Success";
 
-type ErrorCode = null;
+type ErrorCode = never;
 
 export async function deleteRole(role: string) {
-  const data = await apiClient<ApiData, ErrorCode>(`/roles/${role}`, {
+  const res = await withAuth(apiClient)<Data, ErrorCode>(`/roles/${role}`, {
     method: "DELETE",
   });
 
-  // if (data.error) {
-  //   return { data: null, error: data.error };
-  // }
-
-  return { data: data.data, error: null };
+  return res;
 }

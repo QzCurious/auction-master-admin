@@ -22,7 +22,7 @@ interface State {
   token: string | null;
   refreshToken: string | null;
   setLogin: (token: string, refreshToken: string) => void;
-  renewToken: (token: string) => void;
+  setRefreshToken: (token: string) => void;
   clearLogin: () => void;
 
   remember: string | null;
@@ -40,7 +40,7 @@ export const useApiStore = create<State>()(
           const jwt = jwtDecode<JwtPayload>(token);
           set({ jwt, token, refreshToken });
         },
-        renewToken: (token) => {
+        setRefreshToken: (token) => {
           const jwt = jwtDecode<JwtPayload>(token);
           set({ jwt, token });
         },

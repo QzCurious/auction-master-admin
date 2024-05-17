@@ -1,32 +1,26 @@
-import { apiClient } from "@api/client";
+import { apiClient, withAuth } from "@api/apiClient";
+import { throwIfInvalid } from "@api/helpers";
 import { z } from "zod";
 
-export type Role = { role: string; description: string };
-
-type ApiData = "Success";
-
-type ErrorCode = null;
-
-const CreateRoleReqSchema = z.object({
+const ReqSchema = z.object({
   role: z.string(),
   url: z.string(),
   method: z.string(),
 });
-export async function addPermissionToRole(formData: FormData) {
-  const parsed = CreateRoleReqSchema.safeParse(Object.fromEntries(formData));
-  if (parsed.error) {
-    const err = parsed.error.flatten();
-    return { data: null, error: null, parseError: err };
-  }
 
-  const data = await apiClient<ApiData, ErrorCode>("/permissions", {
+export type Role = { role: string; description: string };
+
+type Data = "Success";
+
+type ErrorCode = never;
+
+export async function addPermissionToRole(formData: FormData) {
+  throwIfInvalid(formData, ReqSchema);
+
+  const res = await withAuth(apiClient)<Data, ErrorCode>("/permissions", {
     method: "POST",
     body: formData,
   });
 
-  // if (data.error) {
-  //   return { data: null, error: data.error };
-  // }
-
-  return { data: data.data, error: null };
+  return res;
 }

@@ -32,6 +32,9 @@ export const dataProvider: DataProvider = {
     switch (resource) {
       case "roles": {
         const res = await roles();
+        if (res.error) {
+          throw { statusCode: 401 } as HttpError;
+        }
         return {
           data: res.data.map((role) => ({ id: role.role, ...role })),
           total: res.data.length,
@@ -39,6 +42,9 @@ export const dataProvider: DataProvider = {
       }
       case "permissions": {
         const res = await permissions();
+        if (res.error) {
+          throw { statusCode: 401 } as HttpError;
+        }
         return {
           data: res.data.map((permission) => ({
             id: permission.method + permission.url,
@@ -58,6 +64,9 @@ export const dataProvider: DataProvider = {
     switch (resource) {
       case "roles":
         const res = await rolesPermissions();
+        if (res.error) {
+          throw { statusCode: 401 } as HttpError;
+        }
         const one = res.data.find((d) => d.role === id.toString());
         if (!one) {
           throw { statusCode: 404 } as HttpError;
@@ -77,12 +86,6 @@ export const dataProvider: DataProvider = {
         formData.append("role", variables.role);
         formData.append("description", variables.description);
         const res = await createRole(formData);
-        if (res.error) {
-          throw {
-            message: "Something went wrong",
-            statusCode: 500,
-          } as HttpError;
-        }
         return { data: null };
       default:
         throw new Error("Resource not found");
@@ -125,12 +128,6 @@ export const dataProvider: DataProvider = {
     switch (resource) {
       case "roles":
         const res = await deleteRole(id.toString());
-        if (res.error) {
-          throw {
-            message: "Something went wrong",
-            statusCode: 500,
-          } as HttpError;
-        }
         return { data: null };
       default:
         throw new Error("Resource not found");

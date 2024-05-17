@@ -1,4 +1,4 @@
-import { apiClient } from "@api/client";
+import { apiClient, withAuth } from "@api/apiClient";
 
 export type Permission = {
   method: "GET" | "POST" | "PUT" | "DELETE";
@@ -6,18 +6,14 @@ export type Permission = {
   description: string;
 };
 
-type ApiData = Array<Permission>;
+type Data = Array<Permission>;
 
-type ErrorCode = null;
+type ErrorCode = never;
 
 export async function permissions() {
-  const data = await apiClient<ApiData, ErrorCode>("/permissions", {
+  const res = await withAuth(apiClient)<Data, ErrorCode>("/permissions", {
     method: "GET",
   });
 
-  //   if (data.error) {
-  //     return { data: null, error: data.error };
-  //   }
-
-  return { data: data.data, error: null };
+  return res;
 }

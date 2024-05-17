@@ -1,5 +1,5 @@
 import { useApiStore } from "@api/apiStore";
-import { renewTokenIfExpired } from "@api/client";
+import { refreshTokenIfExpired } from "@api/apiClient";
 import { session } from "@api/session";
 import GitHubIcon from "@mui/icons-material/GitHub";
 import GoogleIcon from "@mui/icons-material/Google";
@@ -47,17 +47,7 @@ const authProvider: AuthProvider = {
     formData.append("password", password);
     const res = await session(formData);
 
-    if (res.parseError) {
-      return {
-        success: false,
-        error: {
-          message: "Validation error",
-          name: "Validation error",
-        },
-      };
-    }
-
-    if (res.error) {
+    if (!res.data) {
       return {
         success: false,
         error: {
@@ -67,6 +57,7 @@ const authProvider: AuthProvider = {
       };
     }
 
+    useApiStore.getState().setLogin(res.data.token, res.data.refreshToken);
     useApiStore.getState().setRemember(rememberMe ? email : null);
 
     return {
@@ -137,7 +128,7 @@ const authProvider: AuthProvider = {
     return { error };
   },
   check: async () => {
-    renewTokenIfExpired();
+    await refreshTokenIfExpired();
     const jwt = useApiStore.getState().jwt;
     if (!jwt) {
       return {

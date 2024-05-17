@@ -1,32 +1,28 @@
-import { apiClient } from "@api/client";
+import { apiClient, withAuth } from "@api/apiClient";
+import { throwIfInvalid } from "@api/helpers";
 import { z } from "zod";
 
 export type Role = { role: string; description: string };
 
-type ApiData = "Success";
+type Data = "Success";
 
-type ErrorCode = null;
+type ErrorCode = never;
 
-const CreateRoleReqSchema = z.object({
+const ReqSchema = z.object({
   role: z.string(),
   url: z.string(),
   method: z.string(),
 });
 export async function removePermissionToRole(formData: FormData) {
-  const parsed = CreateRoleReqSchema.safeParse(Object.fromEntries(formData));
-  if (parsed.error) {
-    const err = parsed.error.flatten();
-    return { data: null, error: null, parseError: err };
-  }
+  throwIfInvalid(formData, ReqSchema);
 
-  const query = new URLSearchParams(parsed.data);
-  const data = await apiClient<ApiData, ErrorCode>(`/permissions?${query}`, {
-    method: "DELETE",
-  });
+  const query = new URLSearchParams(formData as any);
+  const res = await withAuth(apiClient)<Data, ErrorCode>(
+    `/permissions?${query}`,
+    {
+      method: "DELETE",
+    }
+  );
 
-  // if (data.error) {
-  //   return { data: null, error: data.error };
-  // }
-
-  return { data: data.data, error: null };
+  return res;
 }
